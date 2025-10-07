@@ -7,7 +7,7 @@ postgres:
   enabled: true
   image: postgres:15
   user: gogs
-  password: gogs_pass
+  password: ${{ secrets.DB_PASS }}
   database: gogs
   storage: 5Gi
 
