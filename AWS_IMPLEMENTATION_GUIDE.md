@@ -143,7 +143,7 @@ Before deploying the main Gogs infrastructure, you need to provision a DevOps/Ma
 #### Instance Specifications:
 - **Instance Name**: `gogs-devops`
 - **Instance Type**: `t3.medium` (2 vCPU, 4 GiB RAM)
-- **Operating System**: Amazon Linux 2023 or Ubuntu 22.04 LTS
+- **Operating System**: Ubuntu 22.04 LTS
 - **Storage**: 20 GiB gp3 EBS volume
 - **Network**: Public subnet with internet access
 - **Security Group**: Allow SSH (port 22) from your IP
@@ -200,13 +200,13 @@ resource "aws_security_group" "devops_sg" {
   }
 }
 
-data "aws_ami" "amazon_linux" {
+data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 }
 ```
@@ -215,10 +215,14 @@ data "aws_ami" "amazon_linux" {
 ```bash
 #!/bin/bash
 # Update system
-dnf update -y
+apt-get update -y
+apt-get upgrade -y
+
+# Set non-interactive mode for apt
+export DEBIAN_FRONTEND=noninteractive
 
 # Install required packages
-dnf install -y git curl wget unzip
+apt-get install -y git curl wget unzip software-properties-common apt-transport-https ca-certificates gnupg
 
 # Install AWS CLI v2
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -233,25 +237,29 @@ sudo mv terraform /usr/local/bin/
 rm terraform_1.6.6_linux_amd64.zip
 
 # Install kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-rm kubectl
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list
+apt-get update -y
+apt-get install -y kubectl
 
 # Install Helm
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-# Install Docker (for development/testing)
-dnf install -y docker
+# Install Docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io
 systemctl start docker
 systemctl enable docker
-usermod -aG docker ec2-user
+usermod -aG docker ubuntu
 
 # Create working directory
-mkdir -p /home/ec2-user/gogs-deployment
-chown ec2-user:ec2-user /home/ec2-user/gogs-deployment
+mkdir -p /home/ubuntu/gogs-deployment
+chown ubuntu:ubuntu /home/ubuntu/gogs-deployment
 
 # Clone the repository (optional - if repository is public)
-# git clone https://github.com/uditmishra03/gogs.git /home/ec2-user/gogs-deployment/
+# git clone https://github.com/uditmishra03/gogs.git /home/ubuntu/gogs-deployment/
 ```
 
 ### 2. IAM Role for DevOps Instance
@@ -337,7 +345,7 @@ resource "aws_instance" "gogs_devops" {
 2. **Connect to DevOps Instance**:
    ```bash
    # Get the public IP from Terraform output
-   ssh -i your-key.pem ec2-user@<DEVOPS_INSTANCE_PUBLIC_IP>
+   ssh -i your-key.pem ubuntu@<DEVOPS_INSTANCE_PUBLIC_IP>
    ```
 
 3. **Verify Tools Installation**:
@@ -422,7 +430,7 @@ Use the `gogs-devops` EC2 instance provisioned in the previous section. This ins
 
 **Connection Command**:
 ```bash
-ssh -i your-key.pem ec2-user@<DEVOPS_INSTANCE_PUBLIC_IP>
+ssh -i your-key.pem ubuntu@<DEVOPS_INSTANCE_PUBLIC_IP>
 ```
 
 ### Option 2: Local Development Environment
