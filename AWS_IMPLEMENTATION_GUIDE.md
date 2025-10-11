@@ -134,14 +134,305 @@ Build a production-grade, self-hosted Git service using **Gogs** on Amazon EKS, 
 
 ---
 
+## DevOps Infrastructure Setup
+
+Before deploying the main Gogs infrastructure, you need to provision a DevOps/Management instance that will serve as your deployment control center.
+
+### 1. DevOps EC2 Instance Requirements
+
+#### Instance Specifications:
+- **Instance Name**: `gogs-devops`
+- **Instance Type**: `t3.medium` (2 vCPU, 4 GiB RAM)
+- **Operating System**: Amazon Linux 2023 or Ubuntu 22.04 LTS
+- **Storage**: 20 GiB gp3 EBS volume
+- **Network**: Public subnet with internet access
+- **Security Group**: Allow SSH (port 22) from your IP
+
+#### Terraform Configuration for DevOps Instance:
+```hcl
+# devops-instance.tf
+resource "aws_instance" "gogs_devops" {
+  ami           = data.aws_ami.amazon_linux.id
+  instance_type = "t3.medium"
+  key_name      = var.key_pair_name
+  
+  vpc_security_group_ids = [aws_security_group.devops_sg.id]
+  subnet_id              = aws_subnet.public[0].id
+  
+  associate_public_ip_address = true
+  
+  root_block_device {
+    volume_type = "gp3"
+    volume_size = 20
+    encrypted   = true
+  }
+  
+  user_data = base64encode(templatefile("${path.module}/user-data.sh", {}))
+  
+  tags = {
+    Name        = "gogs-devops"
+    Environment = "production"
+    Purpose     = "DevOps Management Instance"
+  }
+}
+
+resource "aws_security_group" "devops_sg" {
+  name        = "gogs-devops-sg"
+  description = "Security group for DevOps instance"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.admin_ip_cidr] # Your IP address
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "gogs-devops-sg"
+  }
+}
+
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+```
+
+#### User Data Script (user-data.sh):
+```bash
+#!/bin/bash
+# Update system
+dnf update -y
+
+# Install required packages
+dnf install -y git curl wget unzip
+
+# Install AWS CLI v2
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+rm -rf aws awscliv2.zip
+
+# Install Terraform
+wget https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
+unzip terraform_1.6.6_linux_amd64.zip
+sudo mv terraform /usr/local/bin/
+rm terraform_1.6.6_linux_amd64.zip
+
+# Install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm kubectl
+
+# Install Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Install Docker (for development/testing)
+dnf install -y docker
+systemctl start docker
+systemctl enable docker
+usermod -aG docker ec2-user
+
+# Create working directory
+mkdir -p /home/ec2-user/gogs-deployment
+chown ec2-user:ec2-user /home/ec2-user/gogs-deployment
+
+# Clone the repository (optional - if repository is public)
+# git clone https://github.com/uditmishra03/gogs.git /home/ec2-user/gogs-deployment/
+```
+
+### 2. IAM Role for DevOps Instance
+
+#### IAM Role Configuration:
+```hcl
+# iam-devops.tf
+resource "aws_iam_role" "devops_role" {
+  name = "gogs-devops-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "devops_policy" {
+  name = "gogs-devops-policy"
+  role = aws_iam_role.devops_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:*",
+          "eks:*",
+          "iam:*",
+          "autoscaling:*",
+          "elasticloadbalancing:*",
+          "route53:*",
+          "s3:*",
+          "cloudformation:*",
+          "logs:*",
+          "cloudwatch:*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "devops_profile" {
+  name = "gogs-devops-profile"
+  role = aws_iam_role.devops_role.name
+}
+
+# Attach the instance profile to the EC2 instance
+resource "aws_instance" "gogs_devops" {
+  # ... previous configuration ...
+  iam_instance_profile = aws_iam_instance_profile.devops_profile.name
+  # ... rest of configuration ...
+}
+```
+
+### 3. Deployment Workflow
+
+#### Step-by-Step Process:
+
+1. **Provision DevOps Instance**:
+   ```bash
+   # Create a separate directory for DevOps infrastructure
+   mkdir gogs-devops-setup
+   cd gogs-devops-setup
+   
+   # Create Terraform files for DevOps instance
+   # (devops-instance.tf, iam-devops.tf, variables.tf)
+   
+   terraform init
+   terraform plan
+   terraform apply
+   ```
+
+2. **Connect to DevOps Instance**:
+   ```bash
+   # Get the public IP from Terraform output
+   ssh -i your-key.pem ec2-user@<DEVOPS_INSTANCE_PUBLIC_IP>
+   ```
+
+3. **Verify Tools Installation**:
+   ```bash
+   # On the DevOps instance, verify all tools are installed
+   aws --version
+   terraform --version
+   kubectl version --client
+   helm version
+   docker --version
+   ```
+
+4. **Setup AWS Credentials**:
+   ```bash
+   # Configure AWS CLI (credentials are inherited from IAM role)
+   aws configure list
+   aws sts get-caller-identity
+   ```
+
+5. **Clone and Deploy**:
+   ```bash
+   # Clone your repository
+   git clone https://github.com/uditmishra03/gogs.git
+   cd gogs/eks-prod
+   
+   # Deploy infrastructure
+   terraform init
+   terraform plan
+   terraform apply
+   ```
+
+### 4. DevOps Instance Outputs
+
+Add these outputs to your DevOps Terraform configuration:
+
+```hcl
+# outputs.tf
+output "devops_instance_public_ip" {
+  description = "Public IP address of the DevOps instance"
+  value       = aws_instance.gogs_devops.public_ip
+}
+
+output "devops_instance_id" {
+  description = "ID of the DevOps instance"
+  value       = aws_instance.gogs_devops.id
+}
+
+output "ssh_connection_command" {
+  description = "SSH command to connect to DevOps instance"
+  value       = "ssh -i your-key.pem ec2-user@${aws_instance.gogs_devops.public_ip}"
+}
+```
+
+### 5. Security Considerations
+
+- **Key Pair**: Ensure you have created an EC2 Key Pair before provisioning
+- **IP Restriction**: Limit SSH access to your specific IP address
+- **IAM Role**: Use IAM roles instead of hardcoded credentials
+- **Encryption**: Enable EBS encryption for the root volume
+- **Updates**: Keep the instance updated with latest security patches
+
+### 6. Cost Considerations
+
+- **Instance Type**: t3.medium is sufficient for most deployments
+- **Shutdown**: Stop the instance when not in use to save costs
+- **Spot Instances**: Consider using Spot instances for cost savings (non-production)
+- **Monitoring**: Set up CloudWatch billing alerts
+
+---
+
 ## Prerequisites
 
-### Local Development Environment
+### Option 1: DevOps EC2 Instance (Recommended)
+Use the `gogs-devops` EC2 instance provisioned in the previous section. This instance comes pre-configured with all required tools:
+
+1. **AWS CLI** v2.x (pre-installed)
+2. **Terraform** v1.6+ (pre-installed)
+3. **kubectl** v1.28+ (pre-installed)
+4. **Helm** v3.12+ (pre-installed)
+5. **Docker** (pre-installed for development/testing)
+6. **IAM Role** with required permissions (pre-configured)
+
+**Connection Command**:
+```bash
+ssh -i your-key.pem ec2-user@<DEVOPS_INSTANCE_PUBLIC_IP>
+```
+
+### Option 2: Local Development Environment
+If you prefer to run from your local machine:
+
 1. **AWS CLI** v2.x configured with appropriate permissions
 2. **Terraform** v1.5+ installed
 3. **kubectl** v1.28+ installed
 4. **Helm** v3.12+ installed
-5. **AWS Load Balancer Controller** (will be installed via Helm)
+5. **Git** for repository management
 
 ### AWS Permissions Required
 ```json
