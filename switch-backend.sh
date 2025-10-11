@@ -60,12 +60,6 @@ switch_to_local() {
 switch_to_s3() {
     log "Switching to S3 backend..."
     
-    # Check if S3 backend setup exists
-    if [ ! -f "../setup-terraform-backend.sh" ]; then
-        error "S3 backend setup script not found!"
-        exit 1
-    fi
-    
     warn "Make sure you have created the S3 backend first!"
     echo "If you haven't, run: cd .. && ./setup-terraform-backend.sh"
     echo ""
@@ -76,15 +70,28 @@ switch_to_s3() {
         log "Backed up current backend.tf to backend.tf.backup"
     fi
     
-    # Check if S3 backend configuration exists
-    if [ ! -f "backend.tf.s3" ]; then
-        error "S3 backend configuration not found!"
-        error "Please run the S3 backend setup script first: cd .. && ./setup-terraform-backend.sh"
-        exit 1
+    # We need to restore the original S3 backend configuration
+    # Check if we have the S3 configuration
+    if grep -q "backend \"s3\"" backend.tf.backup 2>/dev/null; then
+        cp backend.tf.backup backend.tf
+    else
+        # Create default S3 backend config
+        cat > backend.tf << 'EOF'
+# S3 backend configuration  
+# Use this for production when you need shared state and locking
+# Requires S3 bucket and DynamoDB table to be created first
+
+terraform {
+  backend "s3" {
+    bucket         = "gogs-terraform"
+    key            = "eks/prod/terraform.tfstate"
+    region         = "us-west-2"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  }
+}
+EOF
     fi
-    
-    # Replace with S3 backend
-    cp backend.tf.s3 backend.tf
     
     log "✅ Switched to S3 backend"
     info "State will be stored in S3 bucket"

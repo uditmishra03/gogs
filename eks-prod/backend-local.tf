@@ -1,14 +1,9 @@
+# Local backend configuration
+# Use this for development/testing when you don't need shared state
+# To activate: cp backend-local.tf backend.tf && terraform init -reconfigure
+
 terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-  
   # Local backend - state will be stored locally
-  # Comment out this section if you want to use S3 backend
   backend "local" {
     path = "terraform.tfstate"
   }
