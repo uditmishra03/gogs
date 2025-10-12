@@ -1,107 +1,106 @@
-![gogs-brand](https://user-images.githubusercontent.com/2946214/146899259-6a8b58ad-8d6e-40d2-ab02-79dc6aadabbf.png)
+# Kubernetes Deployment for Gogs using Helm and Terraform
 
-[![GitHub Workflow Status](https://img.shields.io/github/checks-status/gogs/gogs/main?logo=github&style=for-the-badge)](https://github.com/gogs/gogs/actions?query=branch%3Amain) [![Sourcegraph](https://img.shields.io/badge/view%20on-Sourcegraph-brightgreen.svg?style=for-the-badge&logo=sourcegraph)](https://sourcegraph.com/github.com/gogs/gogs)
+## Problem Statement
 
-👉 Deploy on DigitalOcean and [get $200 in free credits](https://m.do.co/c/5aeb02268b55)!
+Build a production-grade, self-hosted Git service using Gogs on Amazon EKS, ensuring:
 
-## 🔮 Vision
+- Terraform provisions the entire AWS infrastructure — including VPC, IAM, and an EKS cluster with node groups.
+- Helm deploys Gogs with:
+  - PostgreSQL backend
+  - Persistent storage via EBS
+  - Ingress controller for external access
+- The deployment must be:
+  - Fully reproducible
+  - Secure and scalable
+  - Require minimal manual intervention
 
-The Gogs (`/gɑgz/`) project aims to build a simple, stable and extensible self-hosted Git service that can be set up in the most painless way. With Go, this can be done with an independent binary distribution across all platforms that Go supports, including Linux, macOS, Windows and ARM-based systems.
+### Goal
 
-## 📡 Overview
+Deliver an automated, version-controlled deployment pipeline that spins up a complete Git hosting platform in AWS using one command for infrastructure and one for application deployment.
 
-- Please visit [our home page](https://gogs.io) for user documentation.
-- Please refer to [CHANGELOG.md](CHANGELOG.md) for list of changes in each releases.
-- Want to try it before doing anything else? Do it [online](https://try.gogs.io/gogs/gogs)!
-- Having trouble? Help yourself with [troubleshooting](https://gogs.io/docs/intro/troubleshooting.html) or ask questions in [Discussions](https://github.com/gogs/gogs/discussions).
-- Want to help with localization? Check out the [localization documentation](https://gogs.io/docs/features/i18n.html).
-- Ready to get hands dirty? Read our [contributing guide](.github/CONTRIBUTING.md).
-- Hmm... What about APIs? We have experimental support with [documentation](https://github.com/gogs/docs-api).
+---
 
-## 💌 Features
+## Prerequisites & Setup
 
-- User dashboard, user profile and activity timeline.
-- Access repositories via SSH, HTTP and HTTPS protocols.
-- User, organization and repository management.
-- Repository and organization webhooks, including Slack, Discord and Dingtalk.
-- Repository Git hooks, deploy keys and Git LFS.
-- Repository issues, pull requests, wiki, protected branches and collaboration.
-- Migrate and mirror repositories with wiki from other code hosts.
-- Web editor for quick editing repository files and wiki.
-- Jupyter Notebook and PDF rendering.
-- Authentication via SMTP, LDAP, reverse proxy, GitHub.com and GitHub Enterprise with 2FA.
-- Customize HTML templates, static files and many others.
-- Rich database backend support, including PostgreSQL, MySQL, SQLite3 or any database backend that speaks one of those protocols.
-- Have localization over [31 languages](https://crowdin.com/project/gogs).
+### 1. DevOps Control Server
 
-## 💾 Hardware requirements
+Ensure you have a dedicated server (local or EC2) for running Terraform and Helm commands.
 
-- A Raspberry Pi or $5 Digital Ocean Droplet is more than enough to get you started. Some even use 64MB RAM Docker [CaaS](https://www.docker.com/blog/containers-as-a-service-caas/).
-- 2 CPU cores and 512MB RAM would be the baseline for teamwork.
-- Increase CPU cores when your team size gets significantly larger, memory footprint remains low.
+### 2. Install AWS CLI
 
-## 💻 Browser support
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
+### 3. Configure AWS Credentials
+```bash
+export AWS_ACCESS_KEY_ID=<your-access-key-id>
+export AWS_SECRET_ACCESS_KEY=<your-secret-access-key>
+aws eks --region us-east-1 update-kubeconfig --name gogs-prod-cluster
+```
+### 3. Install kubectl
 
-- Please see [Semantic UI](https://github.com/Semantic-Org/Semantic-UI#browser-support) for specific versions of supported browsers.
-- The smallest resolution officially supported is **1024*768**, however the UI may still look right in smaller resolutions, but no promises or fixes.
+```bash
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl.sha256"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+```
 
-## 📜 Installation
+## AWS Infrastructure
 
-Make sure you install the [prerequisites](https://gogs.io/docs/installation) first.
+### Create Terraform Backend
+```bash
+aws s3api create-bucket --bucket gogs-terraform --region us-east-1
 
-There are 6 ways to install Gogs:
+aws s3api put-bucket-versioning \
+  --bucket gogs-terraform \
+  --region us-east-1 \
+  --versioning-configuration Status=Enabled
 
-- [Install from binary](https://gogs.io/docs/installation/install_from_binary.html)
-- [Install from source](https://gogs.io/docs/installation/install_from_source.html)
-- [Install from packages](https://gogs.io/docs/installation/install_from_packages.html)
-- [Ship with Docker](https://github.com/gogs/gogs/tree/main/docker)
-- [Try with Vagrant](https://github.com/geerlingguy/ansible-vagrant-examples/tree/master/gogs)
+aws dynamodb create-table \
+  --table-name terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
 
-### Deploy to cloud
+```
+### Terraform Installation & Usage
+```bash
+curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+sudo apt-add-repository \
+  "deb [arch=$(dpkg --print-architecture)] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+sudo apt update && sudo apt install terraform
 
-- [Cloudron](https://www.cloudron.io/store/io.gogs.cloudronapp.html)
-- [YunoHost](https://github.com/YunoHost-Apps/gogs_ynh)
-- [alwaysdata](https://www.alwaysdata.com/en/marketplace/gogs/)
+```
+### Terraform Workflow
+```bash
+terraform init
+terraform validate
+terraform plan
+terraform apply
+terraform output
+```
+## Gogs Kubernetes Deployment
 
-### Tutorials
+### 1. Create Namespace
+```bash
+kubectl create namespace gogs
+```
+### 2. EBS CSI Driver
+```bash
+aws iam attach-role-policy \
+  --role-name <your-node-group-role-name> \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
 
-- [Private Git Web Portal in Raspberry PI With Gogs](https://peppe8o.com/private-git-web-portal-in-raspberry-pi-with-gogs/)
-- [How To Set Up Gogs on Ubuntu 14.04](https://www.digitalocean.com/community/tutorials/how-to-set-up-gogs-on-ubuntu-14-04)
-- [Run your own GitHub-like service with the help of Docker](https://blog.hypriot.com/post/run-your-own-github-like-service-with-docker/)
-- [Dockerized Gogs git server and alpine postgres in 20 minutes or less](https://garthwaite.org/docker-gogs.html)
-- [Host Your Own Private GitHub with Gogs](https://eladnava.com/host-your-own-private-github-with-gogs-io/)
-- [使用 Gogs 搭建自己的 Git 服务器](https://blog.mynook.info/post/host-your-own-git-server-using-gogs/) (Chinese)
-- [阿里云上 Ubuntu 14.04 64 位安装 Gogs](https://my.oschina.net/luyao/blog/375654) (Chinese)
-- [Installing Gogs on FreeBSD](https://www.codejam.info/2015/03/installing-gogs-on-freebsd.html)
-- [How to install Gogs on a Linux Server (DigitalOcean)](https://www.youtube.com/watch?v=deSfX0gqefE)
+aws eks create-addon \
+  --cluster-name gogs-prod-cluster \
+  --addon-name aws-ebs-csi-driver \
+  --region us-east-1
 
-## 📦 Software, service and product support
+aws eks describe-addon \
+  --cluster-name gogs-prod-cluster \
+  --addon-name aws-ebs-csi-driver \
+  --region us-east-1
+```
 
-- [Jenkins](https://plugins.jenkins.io/gogs-webhook/) (CI)
-- [Puppet](https://forge.puppet.com/modules/Siteminds/gogs) (IT)
-- [Synology](https://www.synology.com) (Docker)
-- [Syncloud](https://syncloud.org/) (App Store)
-
-## 🙇‍♂️ Acknowledgments
-
-<p>This project is proudly supported by:</p>
-<p>
-  <a href="https://m.do.co/c/5aeb02268b55">
-    <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px">
-  </a>
-</p>
-
-Other acknowledgments:
-
-- Thanks [Egon Elbre](https://twitter.com/egonelbre) for designing the original version of the logo.
-- Thanks [Crowdin](https://crowdin.com/project/gogs) for sponsoring open source translation plan.
-- Thanks [Buildkite](https://buildkite.com) for sponsoring open source CI/CD plan.
-
-## 👋 Contributors
-
-- See [contributors page](https://github.com/gogs/gogs/graphs/contributors) for top 100 contributors.
-- See [TRANSLATORS](conf/locale/TRANSLATORS) for public list of translators.
-
-## ⚖️ License
-
-This project is under the MIT License. See the [LICENSE](https://github.com/gogs/gogs/blob/main/LICENSE) file for the full license text.
