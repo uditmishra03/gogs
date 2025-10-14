@@ -12,11 +12,11 @@ module "iam" {
 }
 
 module "eks" {
-  source        = "./modules/eks"
-  cluster_name  = var.cluster_name
-  vpc_id        = module.vpc.vpc_id
+  source          = "./modules/eks"
+  cluster_name    = var.cluster_name
+  vpc_id          = module.vpc.vpc_id
   private_subnets = module.vpc.private_subnets
-  node_role_arn = module.iam.node_role_arn
-  region        = var.region
+  node_role_arn   = module.iam.node_role_arn
+  region          = var.region
 }
 

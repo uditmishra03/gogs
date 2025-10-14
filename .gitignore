@@ -12,7 +12,10 @@ public/img/avatar/
 /gogs
 profile/
 *.pem
+# NOTE: 'output*' was ignoring legitimate Terraform outputs.tf files inside modules.
+# Keep ignoring other output artifacts but allow standard Terraform outputs.tf to be tracked.
 output*
+!**/outputs.tf
 /release
 .task
 .envrc

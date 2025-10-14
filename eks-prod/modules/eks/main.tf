@@ -1,4 +1,4 @@
-module "eks" {
+module "eks_cluster" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
@@ -29,5 +29,10 @@ module "eks" {
     Environment = "production"
     Application = "Gogs"
   }
+}
+
+output "cluster_name" {
+  value       = var.cluster_name
+  description = "EKS cluster name"
 }
 
