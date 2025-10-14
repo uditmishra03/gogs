@@ -13,8 +13,18 @@ check_tool() {
     fi
 
     local output
-    output=$("$@" 2>&1 | head -n 1 | tr -d '\r')
-    printf '%-20s %s\n' "${label}:" "${output}"
+    output=$("$@" 2>&1 | tr -d '\r')
+
+    local first_line
+    first_line=$(printf '%s\n' "${output}" | head -n 1)
+    printf '%-20s %s\n' "${label}:" "${first_line}"
+
+    local extra_lines
+    extra_lines=$(printf '%s\n' "${output}" | tail -n +2)
+
+    if [[ -n "${extra_lines}" ]]; then
+        printf '%s\n' "${extra_lines}" | sed 's/^/                    /'
+    fi
 }
 
 printf 'Toolchain versions (%s)\n' "$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
