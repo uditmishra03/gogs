@@ -4,7 +4,8 @@
 
 terraform {
   backend "s3" {
-    bucket         = "gogs-terraform"
+    # Updated bucket name (manually created)
+    bucket         = "gogs-terraform-14101025"
     key            = "eks/prod/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true

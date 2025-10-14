@@ -1,9 +1,9 @@
-# Local backend configuration
-# Use this for development/testing when you don't need shared state
-# To activate: cp backend-local.tf backend.tf && terraform init -reconfigure
+# Local backend configuration (EXAMPLE)
+# Rename or copy this file to backend.tf (after removing existing backend.tf)
+# then run: terraform init -reconfigure
+# Only one terraform { backend ... } block can exist in the directory.
 
 terraform {
-  # Local backend - state will be stored locally
   backend "local" {
     path = "terraform.tfstate"
   }
