@@ -3,14 +3,18 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "gogs.fullname" . }}-ingress
+  {{- with .Values.ingress.annotations }}
   annotations:
-{{- range $key, $value := .Values.ingress.annotations }}
+    {{- range $key, $value := . }}
     {{ $key }}: "{{ $value }}"
-{{- end }}
+    {{- end }}
+  {{- end }}
 spec:
-  ingressClassName: {{ .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
   rules:
-    - host: {{ .Values.ingress.hostname }}
+    - {{- if .Values.ingress.hostname }}
+      host: {{ .Values.ingress.hostname }}
+      {{- end }}
       http:
         paths:
           - path: /
@@ -20,7 +24,7 @@ spec:
                 name: {{ include "gogs.fullname" . }}
                 port:
                   number: 80
-  {{- if .Values.ingress.tls.enabled }}
+  {{- if and .Values.ingress.tls.enabled .Values.ingress.hostname }}
   tls:
     - hosts:
         - {{ .Values.ingress.hostname }}
