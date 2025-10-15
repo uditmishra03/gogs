@@ -19,34 +19,20 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
+            # Static simplified database configuration (Bitnami subchart service + fixed credentials)
             - name: DB_TYPE
               value: "postgres"
             - name: DB_HOST
-              value: {{ if .Values.externalDatabase.enabled }}"{{ .Values.externalDatabase.host }}:{{ .Values.externalDatabase.port }}"{{ else }}"{{ include "gogs.fullname" . }}-postgresql:5432"{{ end }}
+              value: "{{ include "gogs.fullname" . }}-postgresql:5432"
             - name: DB_USER
-              value: {{ if .Values.externalDatabase.enabled }}"{{ .Values.externalDatabase.user }}"{{ else }}"{{ .Values.postgresql.auth.username }}"{{ end }}
+              value: "gogs"
             - name: DB_PASSWD
-              {{- if .Values.externalDatabase.enabled }}
-                {{- if .Values.externalDatabase.existingSecret }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.externalDatabase.existingSecret }}
-                  key: postgres-password
-                {{- else }}
-              value: ""
-                {{- end }}
-              {{- else }}
-                {{- if .Values.postgresql.auth.existingSecret }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.postgresql.auth.existingSecret }}
-                  key: postgres-password
-                {{- else }}
-              value: "{{ .Values.postgresql.auth.password }}"
-                {{- end }}
-              {{- end }}
+                  name: gogs-db-secret
+                  key: password
             - name: DB_NAME
-              value: {{ if .Values.externalDatabase.enabled }}"{{ .Values.externalDatabase.database }}"{{ else }}"{{ .Values.postgresql.auth.database }}"{{ end }}
+              value: "gogs"
             - name: RUN_CROND
               value: "true"
             - name: APP_NAME
@@ -54,9 +40,9 @@ spec:
             - name: DOMAIN
               value: "{{ default "" .Values.ingress.hostname }}"
             - name: SSH_PORT
-              value: "{{ .Values.service.sshPort }}"
+              value: "22"
             - name: HTTP_PORT
-              value: "{{ .Values.service.webPort }}"
+              value: "3000"
             - name: APP_URL
               value: {{ if .Values.ingress.hostname }}"http://{{ .Values.ingress.hostname }}"{{ else }}""{{ end }}
             - name: LOG_ROOT_PATH
