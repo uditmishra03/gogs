@@ -55,6 +55,22 @@ spec:
               containerPort: {{ .Values.service.webPort }}
             - name: ssh
               containerPort: {{ .Values.service.sshPort }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: web
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: web
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           {{- if .Values.gogs.resources }}
           resources:
             {{- if .Values.gogs.resources.requests }}
