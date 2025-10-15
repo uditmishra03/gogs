@@ -7,9 +7,24 @@ postgres:
   enabled: true
   image: postgres:15
   user: gogs
-  password: ${{ secrets.DB_PASS }}
+  # Provide EITHER password or existingSecret (recommended: use existingSecret)
+  password: "" # leave blank if using existingSecret
+  existingSecret: {}
+  # existingSecret:
+  #   name: gogs-db-secret
+  #   key: postgres-password
   database: gogs
   storage: 5Gi
+
+gogs:
+  replicas: 2
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
 
 service:
   type: ClusterIP
@@ -19,14 +34,18 @@ service:
 persistence:
   enabled: true
   size: 10Gi
-  storageClassName: gp2
+  storageClassName: gp3
 
 ingress:
   enabled: true
-  className: nginx
-  hostname: gogs.example.com
+  className: alb
+  hostname: "" # set when you have a domain, empty suppresses APP_URL
   annotations:
-    kubernetes.io/ingress.class: nginx
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
   tls:
     enabled: false
     secretName: gogs-tls
