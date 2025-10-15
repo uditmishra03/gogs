@@ -3,18 +3,28 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-postgres:
+postgresql:
   enabled: true
-  image: postgres:15
+  auth:
+    username: gogs
+    database: gogs
+    # Provide one of: password or existingSecret (secret must have key: postgres-password)
+    password: ""        # leave blank if using existingSecret
+    existingSecret: ""  # name of secret with key postgres-password
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: gp2-csi
+  architecture: standalone
+
+externalDatabase:
+  enabled: false
+  host: ""
+  port: 5432
   user: gogs
-  # Provide EITHER password or existingSecret (recommended: use existingSecret)
-  password: "" # leave blank if using existingSecret
-  # Uncomment and set after creating the secret:
-  existingSecret:
-     name: gogs-db-secret
-     key: postgres-password
   database: gogs
-  storage: 5Gi
+  existingSecret: ""   # secret containing key postgres-password
 
 gogs:
   replicas: 2
@@ -31,10 +41,9 @@ service:
   webPort: 3000
   sshPort: 22
 
-persistence:
+gogsPersistence:
   enabled: true
   size: 10Gi
-  # Using gp2-csi (EBS CSI driver). Change to gp3 later if you add a gp3 StorageClass.
   storageClassName: gp2-csi
 
 ingress:

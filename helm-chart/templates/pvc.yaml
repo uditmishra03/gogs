@@ -1,4 +1,4 @@
-{{- if .Values.persistence.enabled }}
+{{- if .Values.gogsPersistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -8,7 +8,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.persistence.size }}
-  storageClassName: {{ .Values.persistence.storageClassName }}
+      storage: {{ .Values.gogsPersistence.size }}
+  storageClassName: {{ .Values.gogsPersistence.storageClassName }}
 {{- end }}
 

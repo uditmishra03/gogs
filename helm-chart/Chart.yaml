@@ -4,4 +4,9 @@ description: A simple self-hosted Git service (Gogs)
 type: application
 version: 0.1.0
 appVersion: "latest"
+dependencies:
+	- name: postgresql
+		version: 15.5.11
+		repository: https://charts.bitnami.com/bitnami
+		condition: postgresql.enabled
 

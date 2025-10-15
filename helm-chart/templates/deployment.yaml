@@ -22,20 +22,31 @@ spec:
             - name: DB_TYPE
               value: "postgres"
             - name: DB_HOST
-              value: "{{ include "gogs.fullname" . }}-postgres.gogs.svc.cluster.local:5432"
+              value: {{ if .Values.externalDatabase.enabled }}"{{ .Values.externalDatabase.host }}:{{ .Values.externalDatabase.port }}"{{ else }}"{{ include "gogs.fullname" . }}-postgresql:5432"{{ end }}
             - name: DB_USER
-              value: "{{ .Values.postgres.user }}"
+              value: {{ if .Values.externalDatabase.enabled }}"{{ .Values.externalDatabase.user }}"{{ else }}"{{ .Values.postgresql.auth.username }}"{{ end }}
             - name: DB_PASSWD
-              {{- if .Values.postgres.existingSecret }}
+              {{- if .Values.externalDatabase.enabled }}
+                {{- if .Values.externalDatabase.existingSecret }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgres.existingSecret.name }}
-                  key: {{ .Values.postgres.existingSecret.key }}
+                  name: {{ .Values.externalDatabase.existingSecret }}
+                  key: postgres-password
+                {{- else }}
+              value: ""
+                {{- end }}
               {{- else }}
-              value: "{{ .Values.postgres.password }}"
+                {{- if .Values.postgresql.auth.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret }}
+                  key: postgres-password
+                {{- else }}
+              value: "{{ .Values.postgresql.auth.password }}"
+                {{- end }}
               {{- end }}
             - name: DB_NAME
-              value: "{{ .Values.postgres.database }}"
+              value: {{ if .Values.externalDatabase.enabled }}"{{ .Values.externalDatabase.database }}"{{ else }}"{{ .Values.postgresql.auth.database }}"{{ end }}
             - name: RUN_CROND
               value: "true"
             - name: APP_NAME

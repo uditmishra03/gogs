@@ -21,8 +21,18 @@ spec:
         env:
         - name: POSTGRES_USER
           value: {{ .Values.postgres.user | quote }}
-        - name: POSTGRES_PASSWORD
-          value: {{ .Values.postgres.password | quote }}
+          - name: POSTGRES_PASSWORD
+  {{- if .Values.postgres.password }}
+            value: {{ .Values.postgres.password | quote }}
+  {{- else if .Values.postgres.existingSecret.name }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.postgres.existingSecret.name }}
+                key: {{ .Values.postgres.existingSecret.key }}
+  {{- else }}
+            # No password configured; provide .Values.postgres.password or postgres.existingSecret.{name,key}
+            value: ""
+  {{- end }}
         - name: POSTGRES_DB
           value: {{ .Values.postgres.database | quote }}
         - name: PGDATA
