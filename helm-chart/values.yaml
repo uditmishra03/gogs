@@ -9,10 +9,10 @@ postgres:
   user: gogs
   # Provide EITHER password or existingSecret (recommended: use existingSecret)
   password: "" # leave blank if using existingSecret
-  existingSecret: {}
-  # existingSecret:
-  #   name: gogs-db-secret
-  #   key: postgres-password
+  # Uncomment and set after creating the secret:
+  existingSecret:
+     name: gogs-db-secret
+     key: postgres-password
   database: gogs
   storage: 5Gi
 
