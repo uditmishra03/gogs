@@ -478,8 +478,8 @@ terraform init
 #### Step 2: Configure Variables
 Create `terraform.tfvars`:
 ```hcl
-region = "us-west-2"
-cluster_name = "gogs-production"
+region = "us-east-1" # Adjust to your chosen region
+cluster_name = "gogs-prod-cluster"
 vpc_cidr = "10.0.0.0/16"
 private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
 public_subnets = ["10.0.101.0/24", "10.0.102.0/24"]
@@ -497,7 +497,7 @@ terraform apply
 
 #### Step 4: Configure kubectl
 ```bash
-aws eks update-kubeconfig --region us-west-2 --name gogs-production
+aws eks update-kubeconfig --region us-east-1 --name gogs-prod-cluster
 ```
 
 ### Phase 2: EKS Add-ons Installation
@@ -510,7 +510,7 @@ helm repo update
 
 helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   -n kube-system \
-  --set clusterName=gogs-production \
+  --set clusterName=gogs-prod-cluster \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller
 ```
@@ -709,7 +709,7 @@ data:
       "logs": {
         "metrics_collected": {
           "kubernetes": {
-            "cluster_name": "gogs-production",
+            "cluster_name": "gogs-prod-cluster",
             "metrics_collection_interval": 60
           }
         }
@@ -907,10 +907,10 @@ helm repo update
 helm upgrade gogs . -n gogs -f values.yaml
 
 # Update EKS cluster
-aws eks update-cluster-version --name gogs-production --version 1.28
+aws eks update-cluster-version --name gogs-prod-cluster --version 1.31 # example target version
 
 # Update node groups
-aws eks update-nodegroup-version --cluster-name gogs-production --nodegroup-name <nodegroup-name>
+aws eks update-nodegroup-version --cluster-name gogs-prod-cluster --nodegroup-name <nodegroup-name>
 ```
 
 ### 3. Rollback Strategy
