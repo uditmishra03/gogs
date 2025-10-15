@@ -1,18 +1,19 @@
-{{- if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "gogs.fullname" . }}-ingress
-  {{- with .Values.ingress.annotations }}
+  labels:
+    app: {{ include "gogs.name" . }}
   annotations:
-    {{- range $key, $value := . }}
-    {{ $key }}: "{{ $value }}"
-    {{- end }}
-  {{- end }}
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
 spec:
-  ingressClassName: {{ .Values.ingress.className | quote }}
+  ingressClassName: "alb"
   rules:
-    - host: {{ (.Values.ingress.hostname | default "") | quote }}
+    - host: "" # set later when DNS is ready
       http:
         paths:
           - path: /
@@ -22,11 +23,4 @@ spec:
                 name: {{ include "gogs.fullname" . }}
                 port:
                   number: 80
-  {{- if and .Values.ingress.tls.enabled .Values.ingress.hostname }}
-  tls:
-    - hosts:
-        - {{ .Values.ingress.hostname }}
-      secretName: {{ .Values.ingress.tls.secretName }}
-  {{- end }}
-{{- end }}
 
