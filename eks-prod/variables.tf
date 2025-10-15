@@ -63,3 +63,9 @@ variable "project" {
   default     = "Gogs"
 }
 
+variable "admin_principal_arn" {
+  description = "(Optional) IAM user or role ARN to grant cluster-admin via EKS Access Entry"
+  type        = string
+  default     = ""
+}
+

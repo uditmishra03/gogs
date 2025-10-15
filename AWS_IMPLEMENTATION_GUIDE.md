@@ -495,6 +495,25 @@ terraform plan
 terraform apply
 ```
 
+#### Step 3b (Optional): Auto-grant admin access
+To automatically provision cluster admin rights to an IAM user or role, set `admin_principal_arn` in `terraform.tfvars` before applying:
+```hcl
+admin_principal_arn = "arn:aws:iam::<ACCOUNT_ID>:user/devops-gogs" # or role ARN
+```
+Terraform will create an EKS Access Entry and associate the AmazonEKSClusterAdminPolicy. If omitted, you can manually create it later:
+```bash
+aws eks create-access-entry \
+  --cluster-name gogs-prod-cluster \
+  --principal-arn arn:aws:iam::<ACCOUNT_ID>:user/devops-gogs \
+  --region us-east-1
+aws eks associate-access-policy \
+  --cluster-name gogs-prod-cluster \
+  --principal-arn arn:aws:iam::<ACCOUNT_ID>:user/devops-gogs \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+  --access-scope type=cluster \
+  --region us-east-1
+```
+
 #### Step 4: Configure kubectl
 ```bash
 aws eks update-kubeconfig --region us-east-1 --name gogs-prod-cluster
