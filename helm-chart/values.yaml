@@ -34,9 +34,8 @@ service:
 persistence:
   enabled: true
   size: 10Gi
-  # Use gp2 since cluster currently has only a gp2 in-tree storage class.
-  # Change to gp3 (and install EBS CSI driver + gp3 StorageClass) later for better cost/performance.
-  storageClassName: gp2
+  # Using gp2-csi (EBS CSI driver). Change to gp3 later if you add a gp3 StorageClass.
+  storageClassName: gp2-csi
 
 ingress:
   enabled: true
