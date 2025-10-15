@@ -31,8 +31,4 @@ module "eks_cluster" {
   }
 }
 
-output "cluster_name" {
-  value       = var.cluster_name
-  description = "EKS cluster name"
-}
 
